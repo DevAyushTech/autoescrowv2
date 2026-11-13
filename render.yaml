@@ -22,7 +22,10 @@ services:
       - key: AUTOESCROW_DATABASE_URL
         sync: false
       - key: AUTOESCROW_REDIS_URL
-        sync: false
+        fromService:
+          name: autoescrow-redis
+          type: keyvalue
+          property: connectionString
       - key: AUTOESCROW_JWT_SECRET
         generateValue: true
       - key: AUTOESCROW_ETHEREUM_CHAIN_ID
@@ -35,3 +38,10 @@ services:
         value: '["https://autoescrowfrontend.vercel.app"]'
       - key: AUTOESCROW_SIWE_STATEMENT
         value: Sign in to AutoEscrow.
+  - type: keyvalue
+    name: autoescrow-redis
+    plan: free
+    region: singapore
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: off

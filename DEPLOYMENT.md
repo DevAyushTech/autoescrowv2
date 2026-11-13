@@ -7,20 +7,19 @@ All escrow activity remains simulated VCR virtual credits with no monetary value
 
 - **API:** Render Free Web Service, Docker runtime, Singapore region.
 - **PostgreSQL:** Supabase Free project.
-- **Redis:** Upstash Redis Free database (TLS URL).
+- **Redis:** Render Key Value Free instance, created by the Blueprint and connected over Render's internal network.
 - **Frontend:** existing Vercel deployment at https://autoescrowfrontend.vercel.app/.
 
 Current free-tier constraints matter:
 - Render Free web services spin down after 15 minutes without inbound traffic and can take about a minute to wake up. Free Render Postgres expires after 30 days, so this setup intentionally uses an external database.
 - Supabase Free includes a 500 MB database and may pause projects after one week of inactivity.
-- Upstash Redis Free currently lists 256 MB storage and 500,000 commands/month.
+- Render Key Value Free has no persistence; it is used only for short-lived cache/rate-limit/nonce data. A restart can invalidate active login challenges.
 - This is suitable for a demo with synthetic data, not an SLA-backed production service. Confirm provider limits before relying on them.
 
 Provider documentation:
 - Render free limits: https://render.com/docs/free
 - Render Blueprint configuration: https://render.com/docs/blueprint-spec
 - Supabase pricing/limits: https://supabase.com/pricing
-- Upstash Redis pricing/limits: https://upstash.com/pricing/redis
 
 ## 1. Connect the GitHub repository to Render
 
@@ -43,11 +42,13 @@ Render's `PORT` environment variable.
 
 Do not commit this URL or put it in frontend variables.
 
-## 3. Create an Upstash Redis database
+## 3. Redis is provisioned by the Render Blueprint
 
-1. Create a Redis database on the Free plan.
-2. Copy its TLS connection URL (`rediss://...`).
-3. Set it as Render's `AUTOESCROW_REDIS_URL` secret.
+The Blueprint creates a free Render Key Value instance in Singapore and wires its
+internal connection string into `AUTOESCROW_REDIS_URL`. No separate Redis account or
+secret is required. Its free plan is non-persistent, which is acceptable for cache,
+rate-limit counters and short-lived SIWE nonces, but active challenges can be lost
+when the service restarts.
 
 ## 4. Set Render environment variables
 
@@ -60,7 +61,7 @@ service environment after the service has a public hostname:
 | `AUTOESCROW_DEBUG` | `false` |
 | `AUTOESCROW_DEMO_CREDIT_ENABLED` | `false` |
 | `AUTOESCROW_DATABASE_URL` | Supabase `postgresql+asyncpg://...` connection string |
-| `AUTOESCROW_REDIS_URL` | Upstash `rediss://...` connection string |
+| `AUTOESCROW_REDIS_URL` | Automatically wired from the Render Key Value service |
 | `AUTOESCROW_JWT_SECRET` | Generate a random secret of at least 32 bytes; Blueprint generates it |
 | `AUTOESCROW_SIWE_DOMAIN` | Bare hostname only, e.g. `autoescrow-api.onrender.com` |
 | `AUTOESCROW_SIWE_URI` | Exact HTTPS origin, e.g. `https://autoescrow-api.onrender.com` |
@@ -93,6 +94,6 @@ never report an on-chain transaction or real-money settlement.
 
 This repository contains the Render Blueprint, but cloud resources cannot be created
 until the owner connects the GitHub repository to Render and supplies the Supabase
-and Upstash connection strings in Render's secret settings. Do not paste secrets in
-chat. Once the public Render hostname exists, set the matching SIWE domain/URI and
-frontend API base URL.
+database connection string in Render's secret settings. Render Key Value is created
+automatically by the Blueprint. Do not paste secrets in chat. Once the public Render
+hostname exists, set the matching SIWE domain/URI and frontend API base URL.
