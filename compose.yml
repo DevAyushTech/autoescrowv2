@@ -1,0 +1,85 @@
+name: autoescrow
+
+x-app-environment: &app-environment
+  AUTOESCROW_ENVIRONMENT: local
+  AUTOESCROW_DEBUG: "false"
+  AUTOESCROW_LOG_LEVEL: INFO
+  AUTOESCROW_LOG_JSON: "true"
+  AUTOESCROW_DATABASE_URL: postgresql+asyncpg://autoescrow:autoescrow@db:5432/autoescrow
+  AUTOESCROW_REDIS_URL: redis://redis:6379/0
+  AUTOESCROW_JWT_SECRET: ${AUTOESCROW_JWT_SECRET:?set AUTOESCROW_JWT_SECRET in .env}
+  AUTOESCROW_ETHEREUM_CHAIN_ID: "11155111"
+  AUTOESCROW_SIWE_DOMAIN: ${AUTOESCROW_SIWE_DOMAIN:-localhost:8000}
+  AUTOESCROW_SIWE_URI: ${AUTOESCROW_SIWE_URI:-http://localhost:8000}
+  AUTOESCROW_SIWE_STATEMENT: ${AUTOESCROW_SIWE_STATEMENT:-Sign in to AutoEscrow.}
+
+x-backend: &backend
+  build:
+    context: ./backend
+  image: autoescrow-backend:local
+  environment: *app-environment
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: autoescrow
+      POSTGRES_PASSWORD: autoescrow
+      POSTGRES_DB: autoescrow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-create-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoescrow -d autoescrow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
