@@ -22,5 +22,3 @@ api_router.include_router(jobs_router)
 api_router.include_router(matching_router)
 api_router.include_router(agreements_router)
 api_router.include_router(ledger_router)
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]

@@ -458,5 +458,3 @@ async def test_agent_audit_events_record_actor_and_subject(
     for event in [*created_events, *updated_events, *deactivated_events]:
         assert str(event["actor_user_id"]) == owner.user["id"]
         assert str(event["subject_id"]) == agent["id"]
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]

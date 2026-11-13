@@ -155,5 +155,3 @@ async def deactivate_my_agent(
     )
     response.headers["Cache-Control"] = "no-store"
     return _response(agent, principal.user.display_name)
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]

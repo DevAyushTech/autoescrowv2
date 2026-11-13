@@ -117,5 +117,3 @@ class AgentListResponse(BaseModel):
     total: int
     limit: int
     offset: int
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]

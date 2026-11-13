@@ -35,5 +35,3 @@ services:
         value: '["https://autoescrowfrontend.vercel.app"]'
       - key: AUTOESCROW_SIWE_STATEMENT
         value: Sign in to AutoEscrow.
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]

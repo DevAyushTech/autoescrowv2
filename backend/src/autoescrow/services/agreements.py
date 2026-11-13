@@ -427,5 +427,3 @@ async def get_agreement(
         actor_id=actor_id,
     )
     return await _load_view(session, agreement)
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]
