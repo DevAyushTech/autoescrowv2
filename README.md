@@ -2,14 +2,15 @@
 
 Trust, verification and secure settlement infrastructure for autonomous AI agents.
 
-This repository currently contains **Milestone M1: Identity & Access** on top of the
-completed M0 foundations. Authentication uses Sign-In with Ethereum (EIP-4361) on
-Ethereum Sepolia (`11155111`), short-lived JWT access tokens, rotating opaque refresh
-tokens, wallet management and role-based access control.
+This repository contains the completed **M0 Foundation**, **M1 Identity & Access**
+and **M2 Core Domain** milestones. Authentication uses Sign-In with Ethereum
+(EIP-4361) on Ethereum Sepolia (`11155111`), short-lived JWT access tokens, rotating
+opaque refresh tokens, wallet management and role-based access control.
 
-Marketplace, agents, jobs, agreements, escrow, contracts, AI verification, disputes
-and reputation are intentionally **not implemented** in M1. Do not build M2 against
-this milestone without starting the next milestone explicitly.
+M2 adds agent profiles, public marketplace discovery, deterministic explainable
+matching, job lifecycle management and immutable versioned agreements with explicit
+acceptance by both parties. Escrow settlement, smart contracts, execution evidence,
+verification, disputes and reputation remain future milestones.
 
 ## Requirements
 
@@ -143,6 +144,26 @@ access token. A login challenge cannot be reused for wallet linking.
 | `GET` | `/api/v1/users/me/wallets` | List the caller's verified wallets |
 | `POST` | `/api/v1/users/me/wallets` | Link a wallet with a signed challenge |
 | `DELETE` | `/api/v1/users/me/wallets/{wallet_id}` | Unlink a wallet (the last wallet is protected) |
+| `POST` | `/api/v1/agents` | Register an agent owned by the caller |
+| `GET` | `/api/v1/agents` | List the caller's agents |
+| `GET` | `/api/v1/agents/{agent_id}` | Read an owned agent |
+| `PATCH` | `/api/v1/agents/{agent_id}` | Update an owned agent |
+| `POST` | `/api/v1/agents/{agent_id}/deactivate` | Deactivate an owned agent |
+| `GET` | `/api/v1/marketplace/agents` | Search/filter public active agents |
+| `GET` | `/api/v1/marketplace/agents/{agent_id}` | Read a public active agent |
+| `POST` | `/api/v1/jobs` | Create a job |
+| `GET` | `/api/v1/jobs` | List the caller's jobs |
+| `GET` | `/api/v1/jobs/public` | Discover public open jobs |
+| `GET` | `/api/v1/jobs/{job_id}` | Read a job visible to the caller |
+| `PATCH` | `/api/v1/jobs/{job_id}` | Update an owned editable job |
+| `POST` | `/api/v1/jobs/{job_id}/cancel` | Cancel an owned job |
+| `POST` | `/api/v1/matching/agents` | Match active agents to explicit requirements |
+| `POST` | `/api/v1/matching/jobs/{job_id}` | Match agents to an owned job |
+| `POST` | `/api/v1/agreements` | Create a versioned agreement |
+| `GET` | `/api/v1/agreements` | List agreements involving the caller |
+| `GET` | `/api/v1/agreements/{agreement_id}` | Read an agreement as a participant |
+| `POST` | `/api/v1/agreements/{agreement_id}/versions` | Create a new immutable version |
+| `POST` | `/api/v1/agreements/{agreement_id}/accept` | Accept the current version |
 | `GET` | `/health`, `/api/v1/health` | Liveness probe |
 | `GET` | `/ready`, `/api/v1/ready` | Readiness probe (PostgreSQL + Redis) |
 
@@ -164,8 +185,8 @@ return a generic `500` response and are logged with a traceback.
 
 Four roles are seeded by the M1 migration:
 
-- `USER` — standard authenticated user
-- `AGENT_OWNER` — future agent ownership
+- `USER` — standard authenticated user with core-domain permissions
+- `AGENT_OWNER` — agent ownership role (same M2 domain permissions)
 - `ARBITRATOR` — includes audit read permission
 - `ADMIN` — all permissions, including role management foundations
 
@@ -198,14 +219,14 @@ operational SQL/service task, not through a client API.
 ```text
 backend/
   alembic/                 Alembic environment and migrations
-    versions/              M0 baseline and M1 identity/access migration
+    versions/              M0 baseline, M1 identity/access and M2 core-domain migrations
   src/autoescrow/
     api/                   Versioned HTTP routes and dependencies
     core/                  Config, logging, middleware, errors, RBAC mappings
     infrastructure/        Database, Redis, SIWE import, rate limiting
-    models/                SQLAlchemy identity, RBAC and audit models
+    models/                SQLAlchemy identity, RBAC, audit and domain models
     schemas/               Pydantic request/response contracts
-    services/              Authentication, SIWE, sessions, users, roles, audit
+    services/              Auth, agents, marketplace, jobs, matching, agreements, audit
     main.py                Application factory and lifespan
   scripts/                 Developer environment helper scripts
   tests/                   Unit, security and integration tests
@@ -213,6 +234,18 @@ backend/
 compose.yml                Local PostgreSQL, Redis and API stack
 infra/postgres/init.sql    Creates the isolated test database
 ```
+
+## M2 acceptance status
+
+- [x] Agent registration, owner-only management and deactivation
+- [x] Public marketplace discovery with search, filters, sorting and pagination
+- [x] Deterministic matching with normalized configurable weights and explanations
+- [x] Job creation, editing, visibility, cancellation and lifecycle validation
+- [x] Immutable, hash-addressed agreement versions
+- [x] Explicit same-version acceptance by both agreement participants
+- [x] Domain audit events and PostgreSQL immutability trigger for agreement versions
+- [x] M2 migration with ownership, validation, uniqueness and discovery indexes
+- [x] M0/M1 regression and M2 domain/security tests
 
 ## M1 acceptance status
 
@@ -230,3 +263,57 @@ infra/postgres/init.sql    Creates the isolated test database
 - [x] Automated M1 security and integration tests
 - [x] Docker Compose stack builds and runs the full M1 flow
 - [x] CI configured for lint, formatting, typing, migrations, tests and Docker build
+
+## M3 — Simulated escrow and virtual-credit ledger
+
+M3 introduces a fully simulated escrow lifecycle. **VCR means virtual credits only**:
+these units are not money, are not redeemable, do not represent ETH/USD/fiat, and
+cannot be withdrawn. No payment provider, blockchain transaction, gas, RPC endpoint,
+or external financial account is used. The agreement's numeric budget is copied only
+as a demo scenario quantity; it is not a currency conversion or promise of monetary
+equivalence.
+
+- Create escrow only from an agreement accepted by both parties.
+- Buyer funds escrow from an available VCR balance.
+- Agent owner can request the demo release; buyer can request the demo refund.
+- These are M3 demonstration transitions, not verification or dispute decisions.
+- Journal entries are double-entry, append-only and protected by PostgreSQL triggers.
+- Every posting is atomic and uses an idempotency key. Available account balances
+  cannot go negative.
+- Demo-credit issuance is disabled by default, blocked in production, and requires
+  ADMIN permission plus `AUTOESCROW_DEMO_CREDIT_ENABLED=true` in a non-production
+  environment. There is no public mint endpoint.
+
+M3 endpoints (all require authentication except health probes):
+
+- `POST /api/v1/escrows` — create from `agreement_id`
+- `GET /api/v1/escrows` and `GET /api/v1/escrows/{escrow_id}`
+- `POST /api/v1/escrows/{escrow_id}/fund`
+- `POST /api/v1/escrows/{escrow_id}/release` (agent owner, demo only)
+- `POST /api/v1/escrows/{escrow_id}/refund` (buyer, demo only)
+- `GET /api/v1/ledger/me` — VCR available and locked balances
+- `GET /api/v1/ledger/me/transactions`
+- `POST /api/v1/admin/demo-credits/{target_user_id}` — ADMIN only and disabled
+  unless demo-credit provisioning is explicitly enabled outside production
+
+Funding/release/refund/demo-credit requests require an `idempotency_key` of at least
+16 characters. Use a new key for each distinct operation and reuse the same key for
+retries. The API marks all balance responses as simulated virtual credits with no
+real-world value.
+
+## M3 implementation checklist
+
+- [x] Escrow creation restricted to mutually accepted agreements
+- [x] VCR-only simulated credit accounts and explicit no-real-value API labels
+- [x] Double-entry journal with database-enforced balancing at commit
+- [x] Append-only ledger transactions and journal entries
+- [x] Atomic funding, release and refund state transitions
+- [x] Idempotency keys and conflict detection for money-moving requests
+- [x] Row locking, non-negative account balances and audit events
+- [x] Participant-only escrow reads and buyer/beneficiary action permissions
+- [x] Admin-only demo-credit issuance, disabled by default and forbidden in production
+- [x] M3 integration tests for funding, release, refund, idempotency and database guards
+- [x] M0/M1/M2 regression suite
+
+M3 implementation is pending final review and explicit acceptance. M4 (execution
+evidence, verification, dispute resolution and reputation) has not started.

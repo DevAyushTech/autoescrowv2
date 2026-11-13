@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     app_name: str = "AutoEscrow API"
     environment: Environment = "local"
     debug: bool = False
+    demo_credit_enabled: bool = False
     api_v1_prefix: str = "/api/v1"
 
     database_url: str
@@ -72,6 +73,27 @@ class Settings(BaseSettings):
     rate_limit_refresh_requests: int = Field(default=30, ge=1, le=100_000)
     rate_limit_session_requests: int = Field(default=60, ge=1, le=100_000)
     rate_limit_wallet_requests: int = Field(default=30, ge=1, le=100_000)
+
+    matching_weight_skills: float = Field(default=0.30, ge=0.0, le=1.0)
+    matching_weight_capabilities: float = Field(default=0.20, ge=0.0, le=1.0)
+    matching_weight_category: float = Field(default=0.15, ge=0.0, le=1.0)
+    matching_weight_availability: float = Field(default=0.10, ge=0.0, le=1.0)
+    matching_weight_budget: float = Field(default=0.25, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_matching_weights(self) -> "Settings":
+        if self.environment == "production" and self.demo_credit_enabled:
+            raise ValueError("demo_credit_enabled must be false in production")
+        total = (
+            self.matching_weight_skills
+            + self.matching_weight_capabilities
+            + self.matching_weight_category
+            + self.matching_weight_availability
+            + self.matching_weight_budget
+        )
+        if total <= 0:
+            raise ValueError("at least one matching weight must be positive")
+        return self
 
     @field_validator("environment", mode="before")
     @classmethod

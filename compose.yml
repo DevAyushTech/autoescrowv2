@@ -5,6 +5,7 @@ x-app-environment: &app-environment
   AUTOESCROW_DEBUG: "false"
   AUTOESCROW_LOG_LEVEL: INFO
   AUTOESCROW_LOG_JSON: "true"
+  AUTOESCROW_DEMO_CREDIT_ENABLED: ${AUTOESCROW_DEMO_CREDIT_ENABLED:-false}
   AUTOESCROW_DATABASE_URL: postgresql+asyncpg://autoescrow:autoescrow@db:5432/autoescrow
   AUTOESCROW_REDIS_URL: redis://redis:6379/0
   AUTOESCROW_JWT_SECRET: ${AUTOESCROW_JWT_SECRET:?set AUTOESCROW_JWT_SECRET in .env}

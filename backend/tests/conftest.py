@@ -72,8 +72,10 @@ async def clean_state(apply_migrations: None, test_settings: Settings) -> AsyncI
     connection = await asyncpg.connect(dsn)
     try:
         await connection.execute(
-            "TRUNCATE TABLE audit_events, auth_nonces, refresh_sessions, "
-            "user_roles, wallets, users RESTART IDENTITY CASCADE"
+            "TRUNCATE TABLE ledger_entries, ledger_transactions, escrows, ledger_accounts, "
+            "agreement_acceptances, agreement_versions, agreements, jobs, agents, audit_events, "
+            "auth_nonces, refresh_sessions, user_roles, wallets, users "
+            "RESTART IDENTITY CASCADE"
         )
     finally:
         await connection.close()

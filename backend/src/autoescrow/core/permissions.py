@@ -11,8 +11,16 @@ class Permission(StrEnum):
     WALLET_WRITE = "wallet:write"
     SESSION_READ = "session:read"
     SESSION_REVOKE = "session:revoke"
+    AGENT_READ = "agent:read"
+    AGENT_WRITE = "agent:write"
+    JOB_READ = "job:read"
+    JOB_WRITE = "job:write"
+    MATCHING_READ = "matching:read"
+    AGREEMENT_READ = "agreement:read"
+    AGREEMENT_WRITE = "agreement:write"
     AUDIT_READ = "audit:read"
     ROLE_ASSIGN = "role:assign"
+    DEMO_CREDIT_ISSUE = "demo_credit:issue"
 
 
 _BASE_PERMISSIONS = frozenset(
@@ -23,6 +31,13 @@ _BASE_PERMISSIONS = frozenset(
         Permission.WALLET_WRITE,
         Permission.SESSION_READ,
         Permission.SESSION_REVOKE,
+        Permission.AGENT_READ,
+        Permission.AGENT_WRITE,
+        Permission.JOB_READ,
+        Permission.JOB_WRITE,
+        Permission.MATCHING_READ,
+        Permission.AGREEMENT_READ,
+        Permission.AGREEMENT_WRITE,
     }
 )
 

@@ -107,6 +107,21 @@ async def get_current_principal(
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_principal)]
 
 
+async def get_optional_principal(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
+    session: DbSession,
+    settings: SettingsDep,
+) -> AuthenticatedUser | None:
+    """Authenticate when a Bearer token is present, otherwise allow public access."""
+
+    if credentials is None:
+        return None
+    return await authenticate_bearer(credentials, session, settings)
+
+
+OptionalUser = Annotated[AuthenticatedUser | None, Depends(get_optional_principal)]
+
+
 def require_permission(
     permission: Permission,
 ) -> Callable[..., Awaitable[AuthenticatedUser]]:

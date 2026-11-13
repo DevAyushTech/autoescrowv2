@@ -1,8 +1,40 @@
 """Shared API schemas."""
 
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+_CURRENCY_PATTERN = re.compile(r"^[A-Z]{3}$")
+
+
+def normalize_tags(values: list[str]) -> list[str]:
+    """Normalize matching tags so identical concepts compare deterministically."""
+
+    normalized = sorted({item.strip().lower() for item in values if item.strip()})
+    if not normalized:
+        raise ValueError("at least one non-blank value is required")
+    if any(len(item) > 50 for item in normalized):
+        raise ValueError("each value must be at most 50 characters")
+    return normalized
+
+
+def normalize_items(values: list[str]) -> list[str]:
+    """Normalize ordered agreement content while removing duplicates and blanks."""
+
+    normalized = sorted({item.strip() for item in values if item.strip()})
+    if not normalized:
+        raise ValueError("at least one non-blank value is required")
+    if any(len(item) > 500 for item in normalized):
+        raise ValueError("each value must be at most 500 characters")
+    return normalized
+
+
+def normalize_currency(value: str) -> str:
+    normalized = value.strip().upper()
+    if not _CURRENCY_PATTERN.fullmatch(normalized):
+        raise ValueError("currency must be a three-letter ISO 4217 code")
+    return normalized
 
 
 class ErrorDetail(BaseModel):

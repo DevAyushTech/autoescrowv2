@@ -23,6 +23,21 @@ class AuditEventType(StrEnum):
     WALLET_UNLINKED = "wallet.unlinked"
     ROLE_ASSIGNED = "rbac.role_assigned"
     ROLE_REVOKED = "rbac.role_revoked"
+    AGENT_CREATED = "agent.created"
+    AGENT_UPDATED = "agent.updated"
+    AGENT_DEACTIVATED = "agent.deactivated"
+    JOB_CREATED = "job.created"
+    JOB_UPDATED = "job.updated"
+    JOB_CANCELLED = "job.cancelled"
+    AGREEMENT_CREATED = "agreement.created"
+    AGREEMENT_VERSION_CREATED = "agreement.version_created"
+    AGREEMENT_ACCEPTED = "agreement.accepted"
+    AGREEMENT_ACTIVATED = "agreement.activated"
+    ESCROW_CREATED = "escrow.created"
+    ESCROW_FUNDED = "escrow.funded"
+    ESCROW_RELEASED = "escrow.released"
+    ESCROW_REFUNDED = "escrow.refunded"
+    LEDGER_DEMO_CREDIT = "ledger.demo_credit"
 
 
 async def record_audit(

@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: autoescrow-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: AUTOESCROW_ENVIRONMENT
+        value: production
+      - key: AUTOESCROW_DEBUG
+        value: "false"
+      - key: AUTOESCROW_DEMO_CREDIT_ENABLED
+        value: "false"
+      - key: AUTOESCROW_LOG_LEVEL
+        value: INFO
+      - key: AUTOESCROW_LOG_JSON
+        value: "true"
+      - key: AUTOESCROW_DATABASE_URL
+        sync: false
+      - key: AUTOESCROW_REDIS_URL
+        sync: false
+      - key: AUTOESCROW_JWT_SECRET
+        generateValue: true
+      - key: AUTOESCROW_ETHEREUM_CHAIN_ID
+        value: "11155111"
+      - key: AUTOESCROW_SIWE_DOMAIN
+        sync: false
+      - key: AUTOESCROW_SIWE_URI
+        sync: false
+      - key: AUTOESCROW_CORS_ALLOWED_ORIGINS
+        value: '["https://autoescrowfrontend.vercel.app"]'
+      - key: AUTOESCROW_SIWE_STATEMENT
+        value: Sign in to AutoEscrow.
+
+[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]
