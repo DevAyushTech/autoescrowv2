@@ -268,5 +268,3 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS autoescrow_check_ledger_balance()")
     op.execute("DROP FUNCTION IF EXISTS autoescrow_reject_ledger_mutation()")
     # ### end Alembic commands ###
-
-[executed on device: Astra (8d3c20ef-574d-4291-9eda-86715d4ce504)]
