@@ -12,6 +12,7 @@ from autoescrow.models.domain import Agreement, AgreementVersion
 from autoescrow.models.enums import AgreementStatus
 from autoescrow.models.identity import User
 from autoescrow.models.ledger import Escrow, LedgerAccount, LedgerEntry, LedgerTransaction
+from autoescrow.models.work import WorkDispute, WorkSubmission
 from autoescrow.services.audit import AuditEventType, record_audit
 
 
@@ -388,6 +389,28 @@ async def _settle(
     if escrow.status != "funded":
         raise ApiError(409, "invalid_escrow_state", "Only a funded escrow can be settled.")
     if kind == "escrow_release":
+        approved_submission = await session.scalar(
+            select(WorkSubmission.id)
+            .where(
+                WorkSubmission.escrow_id == escrow.id,
+                WorkSubmission.status == "approved",
+            )
+            .limit(1)
+        )
+        open_dispute = await session.scalar(
+            select(WorkDispute.id)
+            .where(
+                WorkDispute.escrow_id == escrow.id,
+                WorkDispute.status == "open",
+            )
+            .limit(1)
+        )
+        if approved_submission is None or open_dispute is not None:
+            raise ApiError(
+                409,
+                "work_not_approved",
+                "Escrow release requires buyer-approved work and no open dispute.",
+            )
         target = await _account(session, escrow.agent_owner_user_id, "available", lock=True)
         next_status = "released"
         description = "Release simulated escrow to agent owner"

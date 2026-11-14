@@ -39,6 +39,11 @@ class AuditEventType(StrEnum):
     ESCROW_RELEASED = "escrow.released"
     ESCROW_REFUNDED = "escrow.refunded"
     LEDGER_DEMO_CREDIT = "ledger.demo_credit"
+    WORK_SUBMITTED = "work.submitted"
+    WORK_APPROVED = "work.approved"
+    WORK_REJECTED = "work.rejected"
+    DISPUTE_OPENED = "dispute.opened"
+    DISPUTE_RESOLVED = "dispute.resolved"
 
 
 async def record_audit(

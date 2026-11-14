@@ -10,7 +10,9 @@ from sqlalchemy.exc import DBAPIError
 from autoescrow.core.config import Settings
 from autoescrow.core.errors import ApiError
 from autoescrow.infrastructure.database import Database
+from autoescrow.models.domain import Agreement
 from autoescrow.models.ledger import Escrow, LedgerAccount, LedgerEntry, LedgerTransaction
+from autoescrow.models.work import WorkSubmission
 from autoescrow.services.ledger import (
     _existing_result,
     _legacy_hash_payload,
@@ -105,6 +107,19 @@ async def test_simulated_escrow_fund_release_and_idempotent_retry(
     buyer_balance = client.get(f"{API}/ledger/me", headers=buyer.headers)
     assert buyer_balance.status_code == 200
     assert buyer_balance.json()["available"] == "100.00"
+
+    submission = client.post(
+        f"{API}/escrows/{escrow['id']}/demo-execute",
+        headers=agent_owner.headers,
+    )
+    assert submission.status_code == 201, submission.text
+    reviewed = client.post(
+        f"{API}/submissions/{submission.json()['id']}/review",
+        json={"decision": "approve", "note": "Demo deliverables reviewed and accepted."},
+        headers=buyer.headers,
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["status"] == "approved"
 
     release = client.post(
         f"{API}/escrows/{escrow['id']}/release",
@@ -375,6 +390,25 @@ async def test_concurrent_funding_and_release_cannot_double_settle(
     funding_errors = [result for result in funding_results if isinstance(result, ApiError)]
     assert len(funding_errors) == 1
     assert funding_errors[0].code == "invalid_escrow_state"
+
+    async with database.session() as session:
+        job_id = await session.scalar(
+            select(Agreement.job_id).where(Agreement.id == UUID(agreement["id"]))
+        )
+        assert job_id is not None
+        session.add(
+            WorkSubmission(
+                escrow_id=escrow_id,
+                job_id=job_id,
+                submitted_by_user_id=agent_owner_id,
+                attempt=1,
+                status="approved",
+                summary="Concurrency test approved work",
+                deliverables=[{"name": "test", "status": "accepted"}],
+                executor="manual",
+            )
+        )
+        await session.commit()
 
     async def release(key: str) -> Escrow:
         async with database.session() as session:

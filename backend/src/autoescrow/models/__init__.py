@@ -55,4 +55,8 @@ __all__ = [
     "UserRole",
     "UserStatus",
     "Wallet",
+    "WorkDispute",
+    "WorkSubmission",
 ]
+
+from autoescrow.models.work import WorkDispute, WorkSubmission
