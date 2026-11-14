@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 from uuid import UUID
 
@@ -7,9 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError
 
 from autoescrow.core.config import Settings
+from autoescrow.core.errors import ApiError
 from autoescrow.infrastructure.database import Database
 from autoescrow.models.ledger import Escrow, LedgerAccount, LedgerEntry, LedgerTransaction
-from autoescrow.services.ledger import provision_demo_credits
+from autoescrow.services.ledger import fund_escrow, provision_demo_credits, release_escrow
 from tests.domain_helpers import (
     accept_agreement,
     create_agent,
@@ -280,3 +282,124 @@ async def test_database_rejects_unbalanced_journal_at_commit(
         with pytest.raises(DBAPIError):
             await session.commit()
         await session.rollback()
+
+
+async def test_demo_credit_idempotency_is_bound_to_actor_and_target(
+    client: TestClient, database: Database
+) -> None:
+    actor = login(client, make_wallet(805))
+    other_actor = login(client, make_wallet(806))
+    other_target = login(client, make_wallet(807))
+    key = "demo-credit-scope-0001"
+
+    async with database.session() as session:
+        await provision_demo_credits(
+            session,
+            actor_id=UUID(actor.user["id"]),
+            target_user_id=UUID(actor.user["id"]),
+            amount=Decimal("25.00"),
+            idempotency_key=key,
+        )
+
+    with pytest.raises(ApiError) as target_conflict:
+        async with database.session() as session:
+            await provision_demo_credits(
+                session,
+                actor_id=UUID(actor.user["id"]),
+                target_user_id=UUID(other_target.user["id"]),
+                amount=Decimal("25.00"),
+                idempotency_key=key,
+            )
+    assert target_conflict.value.code == "idempotency_conflict"
+
+    with pytest.raises(ApiError) as actor_conflict:
+        async with database.session() as session:
+            await provision_demo_credits(
+                session,
+                actor_id=UUID(other_actor.user["id"]),
+                target_user_id=UUID(actor.user["id"]),
+                amount=Decimal("25.00"),
+                idempotency_key=key,
+            )
+    assert actor_conflict.value.code == "idempotency_conflict"
+
+    balance = client.get(f"{API}/ledger/me", headers=actor.headers)
+    assert balance.status_code == 200
+    assert balance.json()["available"] == "25.00"
+
+
+async def test_concurrent_funding_and_release_cannot_double_settle(
+    client: TestClient, database: Database
+) -> None:
+    buyer, agent_owner, agreement = await _accepted_agreement(client)
+    created = client.post(
+        f"{API}/escrows",
+        json={"agreement_id": agreement["id"]},
+        headers=buyer.headers,
+    )
+    assert created.status_code == 201, created.text
+    escrow_id = UUID(created.json()["id"])
+    buyer_id = UUID(buyer.user["id"])
+    agent_owner_id = UUID(agent_owner.user["id"])
+
+    async with database.session() as session:
+        await provision_demo_credits(
+            session,
+            actor_id=buyer_id,
+            target_user_id=buyer_id,
+            amount=Decimal("500.00"),
+            idempotency_key="concurrent-demo-credit-001",
+        )
+
+    async def fund(key: str) -> Escrow:
+        async with database.session() as session:
+            return await fund_escrow(
+                session,
+                actor_id=buyer_id,
+                escrow_id=escrow_id,
+                idempotency_key=key,
+            )
+
+    funding_results = await asyncio.gather(
+        fund("concurrent-fund-first-001"),
+        fund("concurrent-fund-second-001"),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(result, Escrow) for result in funding_results) == 1
+    funding_errors = [result for result in funding_results if isinstance(result, ApiError)]
+    assert len(funding_errors) == 1
+    assert funding_errors[0].code == "invalid_escrow_state"
+
+    async def release(key: str) -> Escrow:
+        async with database.session() as session:
+            return await release_escrow(
+                session,
+                actor_id=agent_owner_id,
+                escrow_id=escrow_id,
+                idempotency_key=key,
+            )
+
+    release_results = await asyncio.gather(
+        release("concurrent-release-first-001"),
+        release("concurrent-release-second-001"),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(result, Escrow) for result in release_results) == 1
+    release_errors = [result for result in release_results if isinstance(result, ApiError)]
+    assert len(release_errors) == 1
+    assert release_errors[0].code == "invalid_escrow_state"
+
+    buyer_balance = client.get(f"{API}/ledger/me", headers=buyer.headers)
+    agent_balance = client.get(f"{API}/ledger/me", headers=agent_owner.headers)
+    assert buyer_balance.json()["available"] == "100.00"
+    assert agent_balance.json()["available"] == "400.00"
+
+    async with database.session() as session:
+        transaction_count = int(
+            await session.scalar(select(func.count()).select_from(LedgerTransaction)) or 0
+        )
+        entry_count = int(await session.scalar(select(func.count()).select_from(LedgerEntry)) or 0)
+        escrow = await session.get(Escrow, escrow_id)
+        assert transaction_count == 3
+        assert entry_count == 6
+        assert escrow is not None and escrow.status == "released"
