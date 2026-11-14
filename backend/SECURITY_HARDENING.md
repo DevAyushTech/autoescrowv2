@@ -14,6 +14,8 @@ The migration `20261114_0002` therefore:
   `anon` and `authenticated` roles, when those roles exist.
 - Removes those roles from default privileges for objects created by the
   migration owner in `public`.
+- Revokes inherited `PUBLIC` function execution, including for future functions
+  created by the current migration owner.
 - Pins the search path for the four immutable/audit/ledger trigger functions.
 - Leaves `service_role` privileges unchanged. Never expose its secret key to
   browser code or commit it to source control.
@@ -61,6 +63,7 @@ Expected result:
 - `anon` and `authenticated` have no table privileges on those tables.
 - The four listed trigger functions report
   `search_path=pg_catalog, public, pg_temp`.
+- `anon` and `authenticated` do not inherit `EXECUTE` on those functions.
 - The public marketplace and health endpoints still work because FastAPI
   accesses PostgreSQL through its direct database connection.
 
