@@ -267,6 +267,7 @@ async def create_version(
     )
     agreement.current_version_number = next_version
     agreement.status = AgreementStatus.PENDING_ACCEPTANCE.value
+    agreement.activated_at = None
     session.add(version)
     try:
         await session.flush()
@@ -372,6 +373,7 @@ async def accept_version(
     )
     if acceptance_count == 2 and agreement.status == AgreementStatus.PENDING_ACCEPTANCE.value:
         agreement.status = AgreementStatus.ACTIVE.value
+        agreement.activated_at = datetime.now(UTC)
         if job.status == JobStatus.OPEN.value:
             job.status = JobStatus.IN_PROGRESS.value
         await record_audit(
