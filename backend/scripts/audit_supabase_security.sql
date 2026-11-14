@@ -1,6 +1,7 @@
 -- Read-only Supabase security posture audit for AutoEscrow.
--- Expected: all application tables have RLS enabled and anon/authenticated
--- table privileges are false. This file intentionally does not read user data.
+-- Expected: RLS on application tables, no anon/authenticated table rights,
+-- no inherited RPC EXECUTE rights, and pinned trigger-function search paths.
+-- This script intentionally does not read application user data.
 
 SELECT
     c.relname AS table_name,
@@ -28,7 +29,12 @@ ORDER BY c.relname;
 
 SELECT
     p.proname AS function_name,
-    p.proconfig AS function_settings
+    p.proconfig AS function_settings,
+    CASE WHEN to_regrole('anon') IS NULL THEN NULL
+         ELSE has_function_privilege('anon', p.oid, 'EXECUTE') END AS anon_execute,
+    CASE WHEN to_regrole('authenticated') IS NULL THEN NULL
+         ELSE has_function_privilege('authenticated', p.oid, 'EXECUTE') END
+         AS authenticated_execute
 FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
@@ -40,8 +46,8 @@ WHERE n.nspname = 'public'
   )
 ORDER BY p.proname;
 
--- Review default grants for newly created objects owned by the role used for
--- Alembic migrations. The expected result must not include anon/authenticated.
+-- Review default grants for newly created objects owned by the role used by
+-- Alembic migrations. anon/authenticated/PUBLIC should not receive access.
 SELECT
     defaclrole::regrole AS owner_role,
     defaclnamespace::regnamespace AS schema_name,
