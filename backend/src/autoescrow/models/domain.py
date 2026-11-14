@@ -229,6 +229,12 @@ class Agreement(Base):
         Index("ix_agreements_owner_user_id", "owner_user_id"),
         Index("ix_agreements_agent_owner_user_id", "agent_owner_user_id"),
         Index("ix_agreements_created_by_user_id", "created_by_user_id"),
+        Index(
+            "uq_agreements_job_activated",
+            "job_id",
+            unique=True,
+            postgresql_where=text("activated_at IS NOT NULL"),
+        ),
         Index("ix_agreements_status_updated_at", "status", "updated_at"),
         CheckConstraint(f"status IN ({_AGREEMENT_STATUS_VALUES})", name="status_valid"),
         CheckConstraint("current_version_number > 0", name="version_positive"),
@@ -247,6 +253,7 @@ class Agreement(Base):
         server_default="pending_acceptance",
     )
     current_version_number: Mapped[int] = mapped_column(default=1, server_default="1")
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, server_default=func.now()
     )
