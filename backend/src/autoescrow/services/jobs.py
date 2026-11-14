@@ -7,8 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autoescrow.core.errors import ApiError
-from autoescrow.models.domain import Job
-from autoescrow.models.enums import JobStatus, JobVisibility
+from autoescrow.models.domain import Agreement, Job
+from autoescrow.models.enums import AgreementStatus, JobStatus, JobVisibility
 from autoescrow.models.identity import User
 from autoescrow.schemas.jobs import JobCreateRequest, JobUpdateRequest
 from autoescrow.services.audit import AuditEventType, record_audit
@@ -18,9 +18,7 @@ SortOrder = Literal["asc", "desc"]
 PublicJob = tuple[Job, str]
 
 _EDITABLE_STATUSES = frozenset({JobStatus.DRAFT.value, JobStatus.OPEN.value})
-_CANCELLABLE_STATUSES = frozenset(
-    {JobStatus.DRAFT.value, JobStatus.OPEN.value, JobStatus.IN_PROGRESS.value}
-)
+_CANCELLABLE_STATUSES = frozenset({JobStatus.DRAFT.value, JobStatus.OPEN.value})
 _ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     JobStatus.DRAFT.value: frozenset({JobStatus.DRAFT.value, JobStatus.OPEN.value}),
     JobStatus.OPEN.value: frozenset(
@@ -208,13 +206,41 @@ async def cancel_job(
 
     job.status = JobStatus.CANCELLED.value
     await session.flush()
+
+    # Pending agreements cannot outlive a cancelled job. In-progress jobs are
+    # not cancellable until a contract termination/refund workflow exists.
+    pending_agreements = list(
+        await session.scalars(
+            select(Agreement)
+            .where(
+                Agreement.job_id == job.id,
+                Agreement.status == AgreementStatus.PENDING_ACCEPTANCE.value,
+                Agreement.activated_at.is_(None),
+            )
+            .with_for_update()
+        )
+    )
+    for agreement in pending_agreements:
+        agreement.status = AgreementStatus.CANCELLED.value
+        await record_audit(
+            session,
+            event_type=AuditEventType.AGREEMENT_CANCELLED,
+            subject_type="agreement",
+            subject_id=agreement.id,
+            actor_user_id=owner_id,
+            metadata={"reason": "job_cancelled", "job_id": str(job.id)},
+        )
+
     await record_audit(
         session,
         event_type=AuditEventType.JOB_CANCELLED,
         subject_type="job",
         subject_id=job.id,
         actor_user_id=owner_id,
-        metadata={"status": job.status},
+        metadata={
+            "status": job.status,
+            "cancelled_agreement_count": len(pending_agreements),
+        },
     )
     await session.commit()
     return job
