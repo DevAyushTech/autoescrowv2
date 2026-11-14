@@ -34,12 +34,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        "DROP INDEX IF EXISTS public.ix_escrows_escrow_account_id"
-    )
-    op.execute(
-        "DROP INDEX IF EXISTS public.ix_agreements_created_by_user_id"
-    )
-    op.execute(
-        "DROP INDEX IF EXISTS public.ix_agreement_versions_created_by_user_id"
-    )
+    op.execute("DROP INDEX IF EXISTS public.ix_escrows_escrow_account_id")
+    op.execute("DROP INDEX IF EXISTS public.ix_agreements_created_by_user_id")
+    op.execute("DROP INDEX IF EXISTS public.ix_agreement_versions_created_by_user_id")
