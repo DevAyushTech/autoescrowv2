@@ -10,6 +10,9 @@ tables.
 The migration `20261114_0002` therefore:
 
 - Enables row-level security on the 17 application tables in `public`.
+- Revokes `USAGE` on the `public` schema from `PUBLIC`, `anon` and
+  `authenticated`, preventing access to future objects even if an internal
+  platform-owner default ACL is broader than the application-owner ACL.
 - Revokes table, sequence, and function privileges from the Supabase
   `anon` and `authenticated` roles, when those roles exist.
 - Removes those roles from default privileges for objects created by the
@@ -31,12 +34,11 @@ The current Supabase audit also found a separate platform-managed default
 privilege entry owned by the internal `supabase_admin` role. The connected
 `postgres` migration role is neither a member of nor permitted to assume that
 role, so this migration cannot change that internal role's defaults. The
-application's current Alembic migrations run as `postgres`; those defaults
-are now hardened. If a future operator creates new application tables while
-acting as `supabase_admin`, they must explicitly enable RLS and revoke
-`anon`/`authenticated` grants for those objects as part of that operation.
-Treat this as an outstanding platform-admin control, not as evidence that the
-current 17 application tables remain exposed.
+schema-usage lockdown added in `20261114_0003` provides a second barrier:
+`anon` and `authenticated` cannot reach objects in `public` even if future
+internal defaults grant table privileges. A privileged platform operator
+could still explicitly restore schema access; any such change must be reviewed.
+The current application tables and migration-owner defaults are hardened.
 
 The migration deliberately does not use `FORCE ROW LEVEL SECURITY`: the
 application's SQLAlchemy role owns the tables and must continue to execute
@@ -60,7 +62,9 @@ against the Supabase project after deployment.
 Expected result:
 
 - All 17 application tables report `relrowsecurity = true`.
-- `anon` and `authenticated` have no table privileges on those tables.
+- `anon` and `authenticated` have no `USAGE` on the `public` schema and no
+  table privileges on those tables.
+- The backend database role and `service_role` retain explicit schema `USAGE`.
 - The four listed trigger functions report
   `search_path=pg_catalog, public, pg_temp`.
 - `anon` and `authenticated` do not inherit `EXECUTE` on those functions.
