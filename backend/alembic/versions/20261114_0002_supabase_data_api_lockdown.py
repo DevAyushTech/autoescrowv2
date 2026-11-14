@@ -105,8 +105,7 @@ def upgrade() -> None:
     # changed by a caller-controlled search_path or temporary object shadowing.
     for function_name in _TRIGGER_FUNCTIONS:
         op.execute(
-            f"ALTER FUNCTION public.{function_name}() "
-            "SET search_path = pg_catalog, public, pg_temp"
+            f"ALTER FUNCTION public.{function_name}() SET search_path = pg_catalog, public, pg_temp"
         )
 
 
