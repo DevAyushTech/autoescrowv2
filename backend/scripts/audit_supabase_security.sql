@@ -4,6 +4,12 @@
 -- This script intentionally does not read application user data.
 
 SELECT
+    has_schema_privilege('anon', 'public', 'USAGE') AS anon_public_usage,
+    has_schema_privilege('authenticated', 'public', 'USAGE') AS authenticated_public_usage,
+    has_schema_privilege('service_role', 'public', 'USAGE') AS service_role_public_usage,
+    has_schema_privilege('postgres', 'public', 'USAGE') AS postgres_public_usage;
+
+SELECT
     c.relname AS table_name,
     c.relrowsecurity AS rls_enabled,
     c.relforcerowsecurity AS force_rls,
