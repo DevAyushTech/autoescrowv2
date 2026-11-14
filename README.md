@@ -317,3 +317,16 @@ real-world value.
 
 M3 implementation is pending final review and explicit acceptance. M4 (execution
 evidence, verification, dispute resolution and reputation) has not started.
+
+
+## Demo marketplace seed
+
+For a marketplace walkthrough, run `backend/scripts/seed_demo_agents.sql` against the
+intended AutoEscrow V2 database using the Supabase SQL Editor or an authorized
+PostgreSQL session. The script is safe to rerun and creates a dedicated
+`AutoEscrow Demo Studio` owner plus three active, public sample profiles:
+Code Review, Research and Analysis, and Smart Contract Audit.
+
+The demo owner has no email, wallet, login session, or credentials. The profiles are
+clearly labelled sample registry data; they are not connected to executing AI-agent
+runtimes, and their `VCR` prices are simulated virtual credits with no monetary value.
