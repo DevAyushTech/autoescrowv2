@@ -447,8 +447,9 @@ async def provision_demo_credits(
     target_user_id: UUID,
     amount: Decimal,
     idempotency_key: str,
+    description: str = "Admin-issued simulated demo credits; no monetary value",
 ) -> LedgerTransaction:
-    # This operation is wired only behind demo-mode + ADMIN permission in the API.
+    # Admin issuance remains wired only behind demo-mode + ADMIN permission in the API.
     if await session.get(User, target_user_id) is None:
         raise ApiError(404, "user_not_found", "Target user not found.")
     await session.execute(
@@ -478,7 +479,7 @@ async def provision_demo_credits(
         destination=destination,
         idempotency_key=idempotency_key,
         escrow_id=None,
-        description="Admin-issued simulated demo credits; no monetary value",
+        description=description,
         idempotency_target_id=target_user_id,
     )
     await session.commit()

@@ -11,6 +11,7 @@ from autoescrow.infrastructure.database import Database
 from autoescrow.infrastructure.siwe_library import SiweMessage
 from autoescrow.models.enums import AuthNoncePurpose
 from autoescrow.models.identity import AuthNonce, RefreshSession, User
+from autoescrow.models.ledger import LedgerAccount, LedgerTransaction
 from autoescrow.services.authentication import LoginResult, login_with_siwe
 from autoescrow.services.siwe import issue_nonce, verify_and_consume_nonce
 from tests.helpers import (
@@ -159,6 +160,53 @@ async def test_replay_does_not_create_a_second_user_or_session(
         users = await session.scalar(select(func.count()).select_from(User))
         sessions = await session.scalar(select(func.count()).select_from(RefreshSession))
     assert (users, sessions) == (1, 1)
+
+
+async def test_new_production_user_receives_one_time_welcome_vcr(
+    database: Database, test_settings: Settings
+) -> None:
+    wallet = make_wallet(34)
+    production_settings = test_settings.model_copy(update={"environment": "production"})
+
+    async def authenticate_new_wallet() -> LoginResult:
+        async with database.session() as session:
+            challenge = await issue_nonce(
+                session,
+                test_settings,
+                address=wallet.address,
+                chain_id=CHAIN_ID,
+                purpose=AuthNoncePurpose.LOGIN,
+            )
+        async with database.session() as session:
+            return await login_with_siwe(
+                session,
+                production_settings,
+                message=challenge.message,
+                signature=wallet.sign(challenge.message),
+            )
+
+    first = await authenticate_new_wallet()
+    second = await authenticate_new_wallet()
+    assert first.user.id == second.user.id
+
+    async with database.session() as session:
+        account = await session.scalar(
+            select(LedgerAccount).where(
+                LedgerAccount.owner_user_id == first.user.id,
+                LedgerAccount.account_type == "available",
+            )
+        )
+        grants = list(
+            await session.scalars(
+                select(LedgerTransaction).where(
+                    LedgerTransaction.idempotency_key == f"welcome-vcr-v1:{first.user.id}"
+                )
+            )
+        )
+    assert account is not None and account.balance == 1000
+    assert len(grants) == 1
+    assert grants[0].amount == 1000
+    assert grants[0].currency == "VCR"
 
 
 async def test_unknown_nonce_is_rejected(client: TestClient, database: Database) -> None:

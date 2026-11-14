@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from autoescrow.services.auth_sessions import (
     create_session_tokens,
     load_role_codes,
 )
+from autoescrow.services.ledger import provision_demo_credits
 from autoescrow.services.siwe import verify_and_consume_nonce
 
 
@@ -93,6 +95,18 @@ async def login_with_siwe(
             )
         )
         await session.flush()
+        if settings.environment == "production":
+            await provision_demo_credits(
+                session,
+                actor_id=user.id,
+                target_user_id=user.id,
+                amount=Decimal("1000.00"),
+                idempotency_key=f"welcome-vcr-v1:{user.id}",
+                description=(
+                    "One-time welcome allocation of 1,000 VCR; "
+                    "simulated credits with no monetary value"
+                ),
+            )
 
     if user.status != UserStatus.ACTIVE.value:
         await record_audit(
