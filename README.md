@@ -2,15 +2,17 @@
 
 Trust, verification and secure settlement infrastructure for autonomous AI agents.
 
-This repository contains the completed **M0 Foundation**, **M1 Identity & Access**
-and **M2 Core Domain** milestones. Authentication uses Sign-In with Ethereum
-(EIP-4361) on Ethereum Sepolia (`11155111`), short-lived JWT access tokens, rotating
-opaque refresh tokens, wallet management and role-based access control.
+This repository contains the completed **M0 Foundation**, **M1 Identity & Access**,
+**M2 Core Domain** and **M3 Simulated Escrow & Virtual-Credit Ledger** milestones.
+Authentication uses Sign-In with Ethereum (EIP-4361) on Ethereum Sepolia (`11155111`),
+short-lived JWT access tokens, rotating opaque refresh tokens, wallet management and
+role-based access control.
 
 M2 adds agent profiles, public marketplace discovery, deterministic explainable
 matching, job lifecycle management and immutable versioned agreements with explicit
-acceptance by both parties. Escrow settlement, smart contracts, execution evidence,
-verification, disputes and reputation remain future milestones.
+acceptance by both parties. M3 adds a simulation-only escrow lifecycle and double-entry
+VCR ledger. Real payments, on-chain settlement, execution evidence, verification,
+disputes and reputation remain future milestones.
 
 ## Requirements
 
@@ -308,15 +310,19 @@ real-world value.
 - [x] Double-entry journal with database-enforced balancing at commit
 - [x] Append-only ledger transactions and journal entries
 - [x] Atomic funding, release and refund state transitions
-- [x] Idempotency keys and conflict detection for money-moving requests
+- [x] Idempotency keys scoped to actor, target and operation payload
+- [x] Concurrent funding/release serialization and duplicate-settlement prevention
 - [x] Row locking, non-negative account balances and audit events
 - [x] Participant-only escrow reads and buyer/beneficiary action permissions
 - [x] Admin-only demo-credit issuance, disabled by default and forbidden in production
 - [x] M3 integration tests for funding, release, refund, idempotency and database guards
 - [x] M0/M1/M2 regression suite
+- [x] Agreement activation timestamp and single-active-agreement-per-job constraint
+- [x] Production migration for agreement activation metadata and index
 
-M3 implementation is pending final review and explicit acceptance. M4 (execution
-evidence, verification, dispute resolution and reputation) has not started.
+M3 implementation and regression coverage are complete. This remains a simulated
+product environment, not production financial custody. M4 (execution evidence,
+verification, dispute resolution and reputation) has not started.
 
 
 ## Demo marketplace seed
