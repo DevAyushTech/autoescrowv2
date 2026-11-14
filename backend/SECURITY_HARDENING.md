@@ -91,3 +91,17 @@ Supabase project for insert/update/delete denial tests.
   deployed smart contract.
 - Production financial custody, arbitration, or proof-of-work verification
   requires separate audited systems and a formal security review.
+
+
+## Foreign-key index coverage
+
+Revision `20261114_0004` adds B-tree indexes for three previously uncovered
+foreign-key columns:
+
+- `agreement_versions.created_by_user_id`
+- `agreements.created_by_user_id`
+- `escrows.escrow_account_id`
+
+These are additive indexes only. The migration does not remove any of the
+33 indexes previously reported as unused; unused-index advice must be evaluated
+against representative production workload before considering removal.
