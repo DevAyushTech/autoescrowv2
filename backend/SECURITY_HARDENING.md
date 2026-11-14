@@ -25,6 +25,17 @@ the API's direct database role must remain the table owner or have an
 equivalent explicitly reviewed database privilege. Do not connect the browser
 directly to these tables.
 
+The current Supabase audit also found a separate platform-managed default
+privilege entry owned by the internal `supabase_admin` role. The connected
+`postgres` migration role is neither a member of nor permitted to assume that
+role, so this migration cannot change that internal role's defaults. The
+application's current Alembic migrations run as `postgres`; those defaults
+are now hardened. If a future operator creates new application tables while
+acting as `supabase_admin`, they must explicitly enable RLS and revoke
+`anon`/`authenticated` grants for those objects as part of that operation.
+Treat this as an outstanding platform-admin control, not as evidence that the
+current 17 application tables remain exposed.
+
 The migration deliberately does not use `FORCE ROW LEVEL SECURITY`: the
 application's SQLAlchemy role owns the tables and must continue to execute
 queries after the RLS boundary is enabled. Do not weaken the role or move the
