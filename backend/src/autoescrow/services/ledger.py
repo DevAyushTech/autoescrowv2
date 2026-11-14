@@ -35,6 +35,18 @@ def _hash_payload(
     ).hexdigest()
 
 
+def _legacy_hash_payload(kind: str, escrow_id: UUID | None, amount: Decimal) -> str:
+    """Hash format used before actor/target scoping was introduced."""
+    payload = {
+        "kind": kind,
+        "escrow_id": str(escrow_id) if escrow_id else None,
+        "amount": str(amount),
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
 async def _account(
     session: AsyncSession, owner_id: UUID | None, kind: str, *, lock: bool = False
 ) -> LedgerAccount:
@@ -91,11 +103,25 @@ async def _post(
     )
     if existing is not None:
         if existing.request_hash != digest:
-            raise ApiError(
-                409,
-                "idempotency_conflict",
-                "Idempotency key was already used for a different request.",
+            legacy_retry = (
+                kind == "demo_credit"
+                and existing.actor_user_id == actor_id
+                and existing.request_hash == _legacy_hash_payload(kind, escrow_id, amount)
             )
+            if legacy_retry:
+                credited_account_id = await session.scalar(
+                    select(LedgerEntry.account_id).where(
+                        LedgerEntry.transaction_id == existing.id,
+                        LedgerEntry.side == "credit",
+                    )
+                )
+                legacy_retry = credited_account_id == destination.id
+            if not legacy_retry:
+                raise ApiError(
+                    409,
+                    "idempotency_conflict",
+                    "Idempotency key was already used for a different request.",
+                )
         return existing
     locked_source = await session.scalar(
         select(LedgerAccount).where(LedgerAccount.id == source.id).with_for_update()
@@ -289,14 +315,19 @@ async def _existing_result(
     existing = await session.scalar(
         select(LedgerTransaction).where(LedgerTransaction.idempotency_key == idempotency_key)
     )
-    if existing is not None and existing.request_hash != _hash_payload(
-        kind, escrow.id, escrow.amount, actor_id=actor_id
-    ):
-        raise ApiError(
-            409,
-            "idempotency_conflict",
-            "Idempotency key was already used for a different request.",
+    if existing is not None:
+        expected_hash = _hash_payload(kind, escrow.id, escrow.amount, actor_id=actor_id)
+        legacy_retry = (
+            kind != "demo_credit"
+            and existing.actor_user_id == actor_id
+            and existing.request_hash == _legacy_hash_payload(kind, escrow.id, escrow.amount)
         )
+        if existing.request_hash != expected_hash and not legacy_retry:
+            raise ApiError(
+                409,
+                "idempotency_conflict",
+                "Idempotency key was already used for a different request.",
+            )
     return existing
 
 
