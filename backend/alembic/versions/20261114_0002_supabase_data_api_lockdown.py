@@ -54,21 +54,47 @@ def upgrade() -> None:
     for table_name in _APPLICATION_TABLES:
         op.execute(f'ALTER TABLE public."{table_name}" ENABLE ROW LEVEL SECURITY')
 
-    # Keep Supabase's public API roles away from the application schema.
-    # Role checks allow the same migration to run on plain local PostgreSQL,
-    # where Supabase's anon/authenticated roles may not exist.
+    # Supabase RPC calls execute functions as anon/authenticated. Revoke the
+    # inherited PUBLIC EXECUTE grant as well as explicit role grants.
+    op.execute("REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC")
+    op.execute("ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC")
+
+    # Keep Supabase's public API roles away from application objects. Role
+    # checks allow the same migration to run on plain PostgreSQL, where the
+    # Supabase roles may not exist.
     for role_name in ("anon", "authenticated"):
         op.execute(
             f"""
             DO $$
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role_name}') THEN
-                    EXECUTE 'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM {role_name}';
-                    EXECUTE 'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM {role_name}';
-                    EXECUTE 'REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM {role_name}';
-                    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM {role_name}';
-                    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON SEQUENCES FROM {role_name}';
-                    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM {role_name}';
+                    EXECUTE format(
+                        'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM %I',
+                        '{role_name}'
+                    );
+                    EXECUTE format(
+                        'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM %I',
+                        '{role_name}'
+                    );
+                    EXECUTE format(
+                        'REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM %I',
+                        '{role_name}'
+                    );
+                    EXECUTE format(
+                        'ALTER DEFAULT PRIVILEGES IN SCHEMA public '
+                        'REVOKE ALL PRIVILEGES ON TABLES FROM %I',
+                        '{role_name}'
+                    );
+                    EXECUTE format(
+                        'ALTER DEFAULT PRIVILEGES IN SCHEMA public '
+                        'REVOKE ALL PRIVILEGES ON SEQUENCES FROM %I',
+                        '{role_name}'
+                    );
+                    EXECUTE format(
+                        'ALTER DEFAULT PRIVILEGES IN SCHEMA public '
+                        'REVOKE EXECUTE ON FUNCTIONS FROM %I',
+                        '{role_name}'
+                    );
                 END IF;
             END
             $$;
