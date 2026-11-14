@@ -15,11 +15,20 @@ from autoescrow.models.ledger import Escrow, LedgerAccount, LedgerEntry, LedgerT
 from autoescrow.services.audit import AuditEventType, record_audit
 
 
-def _hash_payload(kind: str, escrow_id: UUID | None, amount: Decimal) -> str:
+def _hash_payload(
+    kind: str,
+    escrow_id: UUID | None,
+    amount: Decimal,
+    *,
+    actor_id: UUID | None,
+    target_user_id: UUID | None = None,
+) -> str:
     payload = {
         "kind": kind,
         "escrow_id": str(escrow_id) if escrow_id else None,
         "amount": str(amount),
+        "actor_id": str(actor_id) if actor_id else None,
+        "target_user_id": str(target_user_id) if target_user_id else None,
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -67,8 +76,15 @@ async def _post(
     idempotency_key: str,
     escrow_id: UUID | None,
     description: str,
+    idempotency_target_id: UUID | None = None,
 ) -> LedgerTransaction:
-    digest = _hash_payload(kind, escrow_id, amount)
+    digest = _hash_payload(
+        kind,
+        escrow_id,
+        amount,
+        actor_id=actor_id,
+        target_user_id=idempotency_target_id,
+    )
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(idempotency_key))))
     existing = await session.scalar(
         select(LedgerTransaction).where(LedgerTransaction.idempotency_key == idempotency_key)
@@ -262,14 +278,19 @@ async def get_escrow(session: AsyncSession, *, actor_id: UUID, escrow_id: UUID) 
 
 
 async def _existing_result(
-    session: AsyncSession, *, kind: str, escrow: Escrow, idempotency_key: str
+    session: AsyncSession,
+    *,
+    kind: str,
+    escrow: Escrow,
+    actor_id: UUID,
+    idempotency_key: str,
 ) -> LedgerTransaction | None:
     await session.execute(select(func.pg_advisory_xact_lock(func.hashtext(idempotency_key))))
     existing = await session.scalar(
         select(LedgerTransaction).where(LedgerTransaction.idempotency_key == idempotency_key)
     )
     if existing is not None and existing.request_hash != _hash_payload(
-        kind, escrow.id, escrow.amount
+        kind, escrow.id, escrow.amount, actor_id=actor_id
     ):
         raise ApiError(
             409,
@@ -286,7 +307,11 @@ async def fund_escrow(
     if actor_id != escrow.buyer_user_id:
         raise ApiError(403, "buyer_only", "Only the buyer can fund this escrow.")
     if await _existing_result(
-        session, kind="escrow_fund", escrow=escrow, idempotency_key=idempotency_key
+        session,
+        kind="escrow_fund",
+        escrow=escrow,
+        actor_id=actor_id,
+        idempotency_key=idempotency_key,
     ):
         return escrow
     if escrow.status != "created":
@@ -321,7 +346,13 @@ async def _settle(
         )
     if kind == "escrow_refund" and actor_id != escrow.buyer_user_id:
         raise ApiError(403, "buyer_only", "Only the buyer can request a demo refund.")
-    if await _existing_result(session, kind=kind, escrow=escrow, idempotency_key=idempotency_key):
+    if await _existing_result(
+        session,
+        kind=kind,
+        escrow=escrow,
+        actor_id=actor_id,
+        idempotency_key=idempotency_key,
+    ):
         return escrow
     if escrow.status != "funded":
         raise ApiError(409, "invalid_escrow_state", "Only a funded escrow can be settled.")
@@ -417,6 +448,7 @@ async def provision_demo_credits(
         idempotency_key=idempotency_key,
         escrow_id=None,
         description="Admin-issued simulated demo credits; no monetary value",
+        idempotency_target_id=target_user_id,
     )
     await session.commit()
     return tx
