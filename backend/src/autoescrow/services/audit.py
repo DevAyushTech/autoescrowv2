@@ -33,6 +33,7 @@ class AuditEventType(StrEnum):
     AGREEMENT_VERSION_CREATED = "agreement.version_created"
     AGREEMENT_ACCEPTED = "agreement.accepted"
     AGREEMENT_ACTIVATED = "agreement.activated"
+    AGREEMENT_CANCELLED = "agreement.cancelled"
     ESCROW_CREATED = "escrow.created"
     ESCROW_FUNDED = "escrow.funded"
     ESCROW_RELEASED = "escrow.released"
