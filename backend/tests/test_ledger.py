@@ -11,7 +11,13 @@ from autoescrow.core.config import Settings
 from autoescrow.core.errors import ApiError
 from autoescrow.infrastructure.database import Database
 from autoescrow.models.ledger import Escrow, LedgerAccount, LedgerEntry, LedgerTransaction
-from autoescrow.services.ledger import fund_escrow, provision_demo_credits, release_escrow
+from autoescrow.services.ledger import (
+    _existing_result,
+    _legacy_hash_payload,
+    fund_escrow,
+    provision_demo_credits,
+    release_escrow,
+)
 from tests.domain_helpers import (
     accept_agreement,
     create_agent,
@@ -403,3 +409,59 @@ async def test_concurrent_funding_and_release_cannot_double_settle(
         assert transaction_count == 3
         assert entry_count == 6
         assert escrow is not None and escrow.status == "released"
+
+
+async def test_legacy_escrow_idempotency_retry_remains_compatible(
+    client: TestClient, database: Database
+) -> None:
+    buyer, agent_owner, agreement = await _accepted_agreement(client)
+    stranger = login(client, make_wallet(808))
+    created = client.post(
+        f"{API}/escrows",
+        json={"agreement_id": agreement["id"]},
+        headers=buyer.headers,
+    )
+    assert created.status_code == 201, created.text
+    escrow_id = UUID(created.json()["id"])
+    buyer_id = UUID(buyer.user["id"])
+    key = "legacy-escrow-retry-0001"
+
+    async with database.session() as session:
+        transaction = LedgerTransaction(
+            idempotency_key=key,
+            request_hash=_legacy_hash_payload("escrow_fund", escrow_id, Decimal("400.00")),
+            kind="escrow_fund",
+            amount=Decimal("400.00"),
+            currency="VCR",
+            actor_user_id=buyer_id,
+            escrow_id=escrow_id,
+            description="Legacy posted escrow funding",
+        )
+        session.add(transaction)
+        await session.commit()
+
+    async with database.session() as session:
+        escrow = await session.get(Escrow, escrow_id)
+        assert escrow is not None
+        existing = await _existing_result(
+            session,
+            kind="escrow_fund",
+            escrow=escrow,
+            actor_id=buyer_id,
+            idempotency_key=key,
+        )
+        assert existing is not None
+        assert existing.id == transaction.id
+
+    async with database.session() as session:
+        escrow = await session.get(Escrow, escrow_id)
+        assert escrow is not None
+        with pytest.raises(ApiError) as conflict:
+            await _existing_result(
+                session,
+                kind="escrow_fund",
+                escrow=escrow,
+                actor_id=UUID(stranger.user["id"]),
+                idempotency_key=key,
+            )
+    assert conflict.value.code == "idempotency_conflict"
