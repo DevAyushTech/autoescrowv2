@@ -329,7 +329,7 @@ def test_agreement_versioning_and_stale_version_rejection(client: TestClient) ->
         headers=owner.headers,
     )
     assert closed.status_code == 409
-    assert error_code(closed) == "job_not_open"
+    assert error_code(closed) == "agreement_cancelled"
 
 
 async def test_both_parties_accept_current_version_and_activate(
@@ -410,6 +410,7 @@ async def test_both_parties_accept_current_version_and_activate(
 
     stored = await _stored_agreement(database, agreement["id"])
     assert stored.status == AgreementStatus.ACTIVE.value
+    assert stored.activated_at is not None
     async with database.session() as session:
         acceptances = int(
             await session.scalar(
@@ -501,7 +502,7 @@ def test_acceptance_rejects_outdated_versions_and_unavailable_jobs(client: TestC
         version_number=2,
     )
     assert cancelled_acceptance.status_code == 409
-    assert error_code(cancelled_acceptance) == "job_not_open"
+    assert error_code(cancelled_acceptance) == "agreement_cancelled"
 
 
 async def test_versioning_after_activation_requires_new_acceptances(
@@ -549,6 +550,8 @@ async def test_versioning_after_activation_requires_new_acceptances(
     assert revised.json()["status"] == "pending_acceptance"
     assert revised.json()["current_version_number"] == 2
     assert len(revised.json()["acceptances"]) == 2
+    revised_row = await _stored_agreement(database, agreement["id"])
+    assert revised_row.activated_at is None
 
     assert (
         accept_agreement(
