@@ -23,8 +23,9 @@ def _resolve_request_id(candidate: str | None) -> str:
 class RequestContextMiddleware:
     """Attach a request ID to logs and responses, and log completed requests."""
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, *, production: bool = False) -> None:
         self.app = app
+        self.production = production
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -43,7 +44,14 @@ class RequestContextMiddleware:
                 headers = MutableHeaders(scope=message)
                 headers[_REQUEST_ID_HEADER] = request_id
                 headers["X-Content-Type-Options"] = "nosniff"
+                headers["X-Frame-Options"] = "DENY"
                 headers["Referrer-Policy"] = "no-referrer"
+                headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+                if self.production:
+                    headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+                    headers["Content-Security-Policy"] = (
+                        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+                    )
             await send(message)
 
         try:

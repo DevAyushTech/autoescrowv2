@@ -138,3 +138,24 @@ def test_openapi_exposes_all_m1_contracts(client: TestClient) -> None:
     assert "/api/v1/users/me" in schema["paths"]
     assert "/api/v1/users/me/wallets" in schema["paths"]
     assert schema["components"]["securitySchemes"]["BearerAuth"]["scheme"] == "bearer"
+
+
+def test_security_headers_include_frame_and_permissions_policy(client: TestClient) -> None:
+    response = client.get(f"{API}/health")
+
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Permissions-Policy"] == "camera=(), microphone=(), geolocation=()"
+
+
+def test_production_responses_include_transport_and_content_security_headers(
+    test_settings: Settings,
+) -> None:
+    settings = test_settings.model_copy(update={"environment": "production"})
+    app = create_app(settings)
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+    assert response.headers["Content-Security-Policy"] == (
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    )

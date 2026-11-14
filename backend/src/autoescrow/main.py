@@ -54,7 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = resolved_settings
-    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(RequestContextMiddleware, production=is_production)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolved_settings.cors_allowed_origins,

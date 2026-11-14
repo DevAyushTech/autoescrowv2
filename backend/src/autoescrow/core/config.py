@@ -195,6 +195,27 @@ class Settings(BaseSettings):
             raise ValueError("siwe_uri authority must match siwe_domain")
         return self
 
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.environment != "production":
+            return self
+
+        if self.debug:
+            raise ValueError("debug must be false in production")
+        if self.sqlalchemy_echo:
+            raise ValueError("sqlalchemy_echo must be false in production")
+        if self.log_level == "DEBUG":
+            raise ValueError("log_level DEBUG is not allowed in production")
+        if urlsplit(self.siwe_uri).scheme != "https":
+            raise ValueError("siwe_uri must use HTTPS in production")
+        if self.siwe_domain == "localhost" or self.siwe_domain.endswith((".localhost", ".local")):
+            raise ValueError("siwe_domain must be a public hostname in production")
+        if self.siwe_domain.startswith(("127.", "0.", "[::1]")):
+            raise ValueError("siwe_domain must not be a loopback or wildcard address in production")
+        if any(not origin.startswith("https://") for origin in self.cors_allowed_origins):
+            raise ValueError("all CORS origins must use HTTPS in production")
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:
