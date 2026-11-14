@@ -107,6 +107,7 @@ class Escrow(Base):
         CheckConstraint("currency = 'VCR'", name="virtual_currency_only"),
         Index("ix_escrows_buyer_created", "buyer_user_id", "created_at"),
         Index("ix_escrows_agent_owner_created", "agent_owner_user_id", "created_at"),
+        Index("ix_escrows_escrow_account_id", "escrow_account_id"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
