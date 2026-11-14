@@ -62,3 +62,13 @@ SELECT
 FROM pg_default_acl
 WHERE defaclnamespace = 'public'::regnamespace
 ORDER BY owner_role, object_type;
+
+
+-- Verify the three previously uncovered foreign-key indexes exist.
+SELECT
+    to_regclass('public.ix_agreement_versions_created_by_user_id')
+        IS NOT NULL AS agreement_versions_creator_index,
+    to_regclass('public.ix_agreements_created_by_user_id')
+        IS NOT NULL AS agreements_creator_index,
+    to_regclass('public.ix_escrows_escrow_account_id')
+        IS NOT NULL AS escrow_account_index;
