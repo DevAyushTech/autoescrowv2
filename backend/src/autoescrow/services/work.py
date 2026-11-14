@@ -252,3 +252,26 @@ async def resolve_dispute(
     )
     await session.commit()
     return dispute
+
+
+async def list_disputes(
+    session: AsyncSession,
+    *,
+    status: str | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[WorkDispute], int]:
+    filters = [WorkDispute.status == status] if status else []
+    total = int(
+        await session.scalar(select(func.count()).select_from(WorkDispute).where(*filters)) or 0
+    )
+    items = list(
+        await session.scalars(
+            select(WorkDispute)
+            .where(*filters)
+            .order_by(WorkDispute.created_at.desc(), WorkDispute.id.asc())
+            .limit(limit)
+            .offset(offset)
+        )
+    )
+    return items, total

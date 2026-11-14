@@ -19,4 +19,5 @@ def test_demo_executor_and_review_routes_are_registered(client: TestClient) -> N
     assert f"{API}/escrows/{{escrow_id}}/submissions" in paths
     assert f"{API}/submissions/{{submission_id}}/review" in paths
     assert f"{API}/submissions/{{submission_id}}/disputes" in paths
+    assert f"{API}/disputes" in paths
     assert f"{API}/disputes/{{dispute_id}}/resolve" in paths

@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from autoescrow.api.dependencies import CurrentUser, DbSession, require_permission
 from autoescrow.core.permissions import Permission
@@ -16,6 +16,7 @@ from autoescrow.schemas.work import (
 )
 from autoescrow.services.work import (
     create_submission,
+    list_disputes,
     list_submissions,
     open_dispute,
     resolve_dispute,
@@ -120,6 +121,18 @@ async def raise_dispute(
     )
     response.headers["Cache-Control"] = "no-store"
     return DisputeResponse.model_validate(item)
+
+
+@router.get("/disputes", response_model=list[DisputeResponse])
+async def get_disputes(
+    session: DbSession,
+    principal: Annotated[CurrentUser, Depends(require_permission(Permission.AUDIT_READ))],
+    status_filter: Annotated[str | None, Query(alias="status", pattern="^(open|resolved)$")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[DisputeResponse]:
+    items, _ = await list_disputes(session, status=status_filter, limit=limit, offset=offset)
+    return [DisputeResponse.model_validate(item) for item in items]
 
 
 @router.post(
