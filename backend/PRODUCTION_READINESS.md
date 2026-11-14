@@ -48,6 +48,17 @@ Before treating the service as a business-critical production system:
 
 These are external operational/billing decisions. This code change does not upgrade provider plans, alter billing, or enable real-money processing.
 
-## Explicitly not implemented
+## Hackathon demo scope now implemented
 
-M4 agent execution, work submission, automated verification, dispute adjudication and reputation are not part of the current API. Do not represent these as available until implemented, tested and deployed as a separately reviewed backend release.
+- Work submissions are stored as workflow records with attempt numbers and deliverable metadata.
+- Buyer approval/rejection is explicit and audit logged.
+- Escrow release requires a buyer-approved submission and no open dispute.
+- Either escrow participant can raise a dispute before settlement; ADMIN/ARBITRATOR can record a release/refund resolution.
+- The deterministic demo executor creates a structured sample submission from job deliverables. It does not call an external LLM, browser, or autonomous agent runtime; the UI must label it as a demo execution.
+- New work tables have RLS enabled and no direct anon/authenticated table privileges.
+
+The hackathon demo flow is documented in backend/HACKATHON_DEMO.md. This is a complete simulated workflow demonstration, not a claim of autonomous real-world task execution, independent verification, or real-money custody.
+
+## Still outside the demo release
+
+A production autonomous agent runtime, external tool/browser execution, cryptographic proof of work, automated independent verification, reputation scoring, real dispute arbitration operations, real-money payments, and financial custody are not implemented. Do not represent these as available.
